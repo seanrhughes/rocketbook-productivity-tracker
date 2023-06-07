@@ -1,0 +1,126 @@
+function processNewTextFiles() {
+  //change this to false if you wish to not delete the .txt file after processing
+  var deleteFileAfterProcess = true;
+
+  var folderName = "Rocketbook";
+  var sheetName = "Productivity";
+  var folder = DriveApp.getFoldersByName(folderName).next();
+  var files = folder.getFilesByType(MimeType.GOOGLE_DOCS);
+  //replace string with your sheet's id
+  var sheet = SpreadsheetApp.openById("1UZiptZ2Quypy1H8q4fIbsAq9IageFm5LrOpxvE_4Ak4").getSheetByName(sheetName);
+  var numRows = sheet.getLastRow() + 1;
+
+  var headers = [];
+  //DECLARE HEADER VALUES HERE
+  //The first header is date automatically. When declaring headers, make sure 
+  //the string is lowercase, and that the string does not contain whitespace.
+  //You should push the header strings in the order that they appear on your spreadsheet.
+  //prepend "NUM" or "TXT" (All Caps) followed by a space to the header, to indicate the type of that column,
+  //number (integer or float), or text respectively. If the line is a text line, make sure to seperate
+  //the header key to the text with a colon when writing it in the notebook.
+
+  /* ***** START ***** */
+  headers.push("NUM calories");
+  headers.push("NUM weight");
+  headers.push("NUM sales");
+  headers.push("NUM hoursproductive");
+  headers.push("TXT notes");
+  /* ****** END ****** */
+  
+  /*END*/
+
+  while (files.hasNext()) {
+    var file = files.next();
+    var fileName = file.getName();
+    var lastRow = sheet.getLastRow();
+    var fileURL = file.getUrl();
+    var docContent = DocumentApp.openById(file.getId()).getBody().getText().split('\n');
+
+    var regex = /^RB (\d{4})-(\d{2})-(\d{2})/
+    var match = fileName.match(regex);
+    sheet.getRange(numRows, 1).setValue(match[2] + "/" + match[3] + "/" + match[1]);
+
+    for (var i = 0; i < docContent.length; i++) {
+      if (docContent[i].trim() != "") {
+        var line = docContent[i].trim();
+        var lowerLine = line.toLowerCase();
+        var noWSLine = lowerLine.replace(/\s+/g, "");
+
+        for (var index = 0; index < headers.length; index++) {
+          var headerSplit = headers[index].split(" ");
+          var dataType = headerSplit[0];
+          var currHeader = headerSplit[1];
+
+          if (noWSLine.includes(currHeader)) {
+            if (dataType.includes("NUM")) {
+              //iterate until we find doc or we find next header
+              var stringMatch = noWSLine.match(/((?:\d+\.?|\d*\.)\d*)/);
+              var stringBuilder = "";
+              if (stringMatch) {
+                stringBuilder += stringMatch[1].replace(/\n+/g, "");
+              }
+              counter = i + 1;
+              sentinel = true;
+              while(sentinel) {
+                for (var inner = 0; inner < headers.length; inner++) {
+                  var innerSplit = headers[inner].split(" ");
+                  var innerHeader = innerSplit[1];
+                  
+                  if (counter >= docContent.length || docContent[counter].trim().toLowerCase()
+                      .replace(/\s+/g, "").includes(innerHeader)) {
+                    sentinel = false;
+                    break;
+                  }
+                }
+                if (sentinel) {
+                  //build string
+                  stringMatch = docContent[counter].trim().toLowerCase().replace(/\s+/g, "")
+                    .match(/((?:\d+\.?|\d*\.)\d*)/);
+                  if (stringMatch) {
+                    stringBuilder += stringMatch[1].replace(/\n+/g, "");
+                  }
+                  counter++;
+                }
+              }
+              sheet.getRange(numRows, index + 2).setValue(stringBuilder);
+
+            } else if (dataType.includes("TXT")) {
+              textMatch = line.match(/^.*(?::|;)(.*)$/);
+              stringBuilder = "";
+              if (textMatch) {
+                stringBuilder += textMatch[1].trim().replace(/\n+/g, "");
+                stringBuilder += " ";
+              }
+              counter = i + 1;
+              sentinel = true;
+              while(sentinel) {
+                for (var inner = 0; inner < headers.length; inner++) {
+                  var innerSplit = headers[inner].split(" ");
+                  var innerHeader = innerSplit[1];
+                  
+                  if (counter >= docContent.length || docContent[counter].trim().toLowerCase()
+                      .replace(/\s+/g, "").includes(innerHeader)) {
+                    sentinel = false;
+                    break;
+                  }
+                }
+                if (sentinel) {
+                  //build string
+                  stringMatch = docContent[counter].trim()
+                    .match(/^(.+)$/);
+                  if (stringMatch) {
+                    stringBuilder += stringMatch[1].replace(/\n+/g, "");
+                    stringBuilder += " ";
+                  }
+                  counter++;
+                }
+              }
+              sheet.getRange(numRows, index + 2).setValue(stringBuilder);
+            }
+          } 
+        }
+      }
+    }
+    file.setTrashed(deleteFileAfterProcess);
+  }
+}
